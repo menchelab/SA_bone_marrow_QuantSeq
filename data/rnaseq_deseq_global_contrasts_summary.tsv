@@ -1,0 +1,16 @@
+Design	Numerator	Denominator	Label	Exclude	Significant	SignificantUp	SignificantDown	Effective	EffectiveUp	EffectiveDown
+global	celltype_Neu_vs_Eos	NA	Neu versus Eos	FALSE	7325	3889	3436	8688	4489	4199
+global	celltype_EosP_vs_Eos	NA	EosP versus Eos	FALSE	2496	516	1980	2069	226	1843
+global	celltype_NeuP_vs_Eos	NA	NeuP versus Eos	FALSE	1161	263	898	882	90	792
+global	celltype_GMP_vs_Eos	NA	GMP versus Eos	FALSE	585	258	327	149	59	90
+global	celltype_CMP_vs_Eos	NA	CMP versus Eos	FALSE	891	235	656	575	59	516
+global	celltype_EosP_vs_Eos	celltype_Neu_vs_Eos	EosP versus Neu	FALSE	8058	2633	5425	9115	3018	6097
+global	celltype_NeuP_vs_Eos	celltype_Neu_vs_Eos	NeuP versus Neu	FALSE	7842	2964	4878	9143	3493	5650
+global	celltype_GMP_vs_Eos	celltype_Neu_vs_Eos	GMP versus Neu	FALSE	7480	3075	4405	8751	3702	5049
+global	celltype_CMP_vs_Eos	celltype_Neu_vs_Eos	CMP versus Neu	FALSE	6392	2925	3467	8362	3999	4363
+global	celltype_NeuP_vs_Eos	celltype_EosP_vs_Eos	NeuP versus EosP	FALSE	1651	903	748	1447	835	612
+global	celltype_GMP_vs_Eos	celltype_EosP_vs_Eos	GMP versus EosP	FALSE	1762	1305	457	1378	1152	226
+global	celltype_CMP_vs_Eos	celltype_EosP_vs_Eos	CMP versus EosP	FALSE	3310	2085	1225	3750	2510	1240
+global	celltype_GMP_vs_Eos	celltype_NeuP_vs_Eos	GMP versus NeuP	FALSE	531	423	108	309	299	10
+global	celltype_CMP_vs_Eos	celltype_NeuP_vs_Eos	CMP versus NeuP	FALSE	2258	1265	993	2199	1329	870
+global	celltype_CMP_vs_Eos	celltype_GMP_vs_Eos	CMP versus GMP	FALSE	2060	977	1083	1667	782	885

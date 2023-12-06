@@ -1,0 +1,213 @@
+---
+title: "DE_analysis"
+author: "Anna Hakobyan"
+date: "2023-12-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(comment = '', fig.width = 6, 
+                      fig.height = 6, echo = FALSE, 
+                      warning = FALSE)
+```
+
+
+```{r, include=FALSE}
+library(here)
+library(DESeq2)
+library(tidyverse)
+library(ggrepel)
+library(openxlsx)
+library(EnhancedVolcano)
+library(fgsea)
+library(stringr)
+
+out.dir = here("outputs")
+fig.dir = here("figures")
+
+for (dir in c(out.dir, fig.dir)) {
+    if (!exists(dir) ) {
+        dir.create(dir)
+    }
+}
+
+source(here("scripts/functions.R"))
+source("../../SA_bone_marrow/R/functions.R")
+```
+
+### Reading in the data
+
+```{r}
+smp.table = read.delim(here("data/samples_quantseq_SAHDME23.csv"), sep = ",")
+
+smp.table = smp.table %>%
+    mutate(cell.type = gsub("(.*)__(.*)", "\\1", Condition_ID),
+           treatment = gsub("(.*)__(.*)", "\\2", Condition_ID))
+
+cell.types = unique(smp.table$cell.type)
+
+counts.raw = read.delim(here("data/rnaseq_deseq_global_counts_raw.tsv"))
+colnames(counts.raw) = gsub("(MR_54_[0-9]*)_S.*", "\\1", colnames(counts.raw))
+
+gene.data = counts.raw[, 1:8]
+```
+
+### DESeq2 for all the cell types 
+
+```{r, message = FALSE, echo = FALSE, include = FALSE}
+ct.res = list()
+for (ct in cell.types) {
+    
+    cat("DESeq2 for ", ct, "\n")
+    
+    ct.res[[ct]] = get_celltype_DEseq2(ct, counts.raw, smp.table, min.gene.counts = 3)
+    
+    ct.res[[ct]]$res_df = as.data.frame(ct.res[[ct]]$res) %>% 
+        rownames_to_column(var = "gene_id") %>% 
+        left_join(., gene.data %>% select(gene_id, gene_name), by = "gene_id") %>% 
+        select(gene_name, baseMean, log2FoldChange, lfcSE, pvalue, padj)
+}
+
+
+```
+
+```{r}
+
+DE.files.xlsx = file.path(out.dir, "DE.genes.SAvsPBS.xlsx")
+
+if (!file.exists(DE.files.xlsx)) {
+    wb <- createWorkbook()
+}else {
+    wb = loadWorkbook(filename)
+}
+
+for (ct in cell.types) {
+    addWorksheet(wb, ct)
+    
+    writeData(wb = wb,
+              sheet = ct,
+              x = ct.res[[ct]]$res_df %>% arrange(padj),
+              colNames = TRUE,
+              rowNames = FALSE)
+}
+
+saveWorkbook(wb, file = DE.files.xlsx, overwrite = TRUE)
+
+add_mouse_geneinfo(DE.files.xlsx)
+```
+
+### Making the volcano plots
+
+```{r}
+for (ct in cell.types) {
+    
+    res.out = ct.res[[ct]]$res
+    lab.names = ct.res[[ct]]$res %>% 
+        as.data.frame %>% 
+        rownames_to_column(var = "gene_id") %>% 
+        dplyr::left_join (., gene.data %>% dplyr::select(gene_id, gene_name) ,
+                                                 by = "gene_id") %>% pull(gene_name)
+    
+    pp = EnhancedVolcano(res.out,
+        lab = lab.names,
+        x = 'log2FoldChange',
+        y = 'pvalue',
+        title = paste0(ct, " SA vs PBS"),
+        pCutoff = 0.05,
+        FCcutoff = 1,
+        pointSize = 3.0,
+        labSize = 6.0,
+        col=c('black', 'black', 'black', 'red3'),
+        colAlpha = 1)
+        ggsave(plot = pp, filename = file.path(fig.dir, paste0(ct,".SAvsPBS.pdf")),
+               width = 4, height = 6)
+}
+```
+
+
+### FGSEA analysis 
+
+```{r}
+gene.sets = list()
+
+for (gene.set.paths in list.files(here("data/gene_sets"), full.names = TRUE)) {
+    file.base = basename(gene.set.paths)
+    
+    gene.sets[[file.base]] = read_gene_sets(gene.set.paths)
+}
+```
+
+
+```{r}
+fgsea.set = list()
+
+for (ct in cell.types) {
+    ranks = setNames(ct.res[[ct]]$res$log2FoldChange, ct.res[[ct]]$res_df$gene_name)
+    names(ranks) = convert_mouse_to_human(names(ranks))
+
+    cell.type.gseas = list()
+    
+    for(gene.set in names(gene.sets)) {
+        
+        fgseaRes <- fgsea(gene.sets[[gene.set]], ranks, minSize = 20, maxSize=500)    
+        cell.type.gseas[[gene.set]] = fgseaRes    
+        
+    }
+    fgsea.set[[ct]] = cell.type.gseas
+}
+
+```
+
+```{r}
+filtered.fgsea = list()
+for (ct in names(MA.mature.clust.DE.list)) {
+    
+    cell.type.gseas = list()
+    for(gene.set in names(gene.sets)) {
+        cell.type.gseas[[gene.set]] = fgsea.set[[ct]][[gene.set]] %>% 
+            filter(pval < 0.05) %>% arrange(pval, ES)
+    }
+    filtered.fgsea[[ct]] = cell.type.gseas
+  
+    write_excel_allsheets(filtered.fgsea[[ct]], file.path(out.dir, paste0( ct, ".SAvsPBS.FGSEA.xlsx")) )
+}
+
+saveRDS(filtered.fgsea, file = file.path(out.dir, "DE.list.FGSEA.RDS"))
+# filtered.fgsea = readRDS(file = file.path(out.dir, "DE.list.FGSEA.RDS"))
+```
+
+```{r}
+for (ct in cell.types) {
+    for (gset in names(filtered.fgsea[[ct]])) {
+        
+        path.number = filtered.fgsea[[ct]][[gset]] %>%
+            
+            mutate(pathway = gsub(" \\(GO:.*\\)", "", pathway)) %>% 
+            filter(pval < 0.05) %>% nrow
+        
+        if (path.number)
+        pp =  filtered.fgsea[[ct]][[gset]] %>%
+            mutate(pathway = gsub(" \\(GO:.*\\)", "", pathway),
+                   pathway = gsub(" (PMID.*)$", "", pathway),
+                   pathway = gsub(" (GSE.*)$", "", pathway)) %>% 
+            filter(pval < 0.05) %>% 
+            ggplot(aes(y = pathway, x = 1, size = -log10(pval), color = ES)) + 
+            geom_point() + scale_color_gradient2(low = scales::muted("blue"), high = scales::muted("red")) + 
+            scale_x_continuous(expand = c(0.1, 0.1)) +
+            scale_y_discrete(labels = function(x) str_wrap(x, width = 100) ) +
+            theme_bw() + 
+            theme(axis.title.x = element_blank(),
+                  axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank(),
+                  panel.grid.major.x = element_blank(),
+                  panel.grid.minor.x = element_blank())
+        
+        ggsave(filename = file.path(fig.dir, paste(ct, gset, "fgsea.pdf", sep = ".")),
+               plot = pp,
+               width = 8, height = path.number / 8 + 2)
+    }
+}
+
+```
+
+
