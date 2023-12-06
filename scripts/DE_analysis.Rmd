@@ -119,8 +119,8 @@ for (ct in cell.types) {
         labSize = 6.0,
         col=c('black', 'black', 'black', 'red3'),
         colAlpha = 1)
-        ggsave(plot = pp, filename = file.path(fig.dir, paste0(ct,".SAvsPBS.pdf")),
-               width = 4, height = 6)
+        ggsave(plot = pp, filename = file.path(fig.dir, paste0(ct,".SAvsPBS․Volcano.pdf")),
+               width = 7, height = 6)
 }
 ```
 
@@ -160,7 +160,7 @@ for (ct in cell.types) {
 
 ```{r}
 filtered.fgsea = list()
-for (ct in names(MA.mature.clust.DE.list)) {
+for (ct in cell.types) {
     
     cell.type.gseas = list()
     for(gene.set in names(gene.sets)) {
