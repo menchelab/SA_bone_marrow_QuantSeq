@@ -21,6 +21,8 @@ library(openxlsx)
 library(EnhancedVolcano)
 library(fgsea)
 library(stringr)
+library(ComplexHeatmap)
+library(colorRamp2)
 
 out.dir = here("outputs")
 fig.dir = here("figures")
@@ -67,8 +69,6 @@ for (ct in cell.types) {
         left_join(., gene.data %>% select(gene_id, gene_name), by = "gene_id") %>% 
         select(gene_name, baseMean, log2FoldChange, lfcSE, pvalue, padj)
 }
-
-
 ```
 
 ```{r}
@@ -124,6 +124,65 @@ for (ct in cell.types) {
 }
 ```
 
+### Heatmaps of DEGs 
+
+```{r}
+center_apply <- function(x) {
+    out = t(apply(x, 1, function(y) y - mean(y)))
+    rownames(out) = rownames(x)
+    colnames(out) = colnames(x)
+    
+    return(out)
+}
+
+for (ct in cell.types) {
+    
+    rld = rlog (ct.res[[ct]]$dds)
+    
+    DE.genes = ct.res[[ct]]$res %>% as.data.frame() %>% 
+        rownames_to_column("gene") %>%
+        filter(padj < 0.05, abs(log2FoldChange) > 1.8 ) %>% pull(gene) 
+        
+    mat = assay(rld)[DE.genes, ]
+     
+    mat.centered = center_apply(mat)
+    
+    rdbu.palette = colorRamp2(c(quantile(mat.centered, 0.01), 0, quantile(mat.centered, 0.99)), 
+                          c("dodgerblue4", "white", "darkred"), space = "RGB")
+
+    
+    lab.names = DE.genes %>% 
+        enframe(value = "gene_id") %>% 
+        dplyr::left_join (., gene.data %>% dplyr::select(gene_id, gene_name) ,
+                                                 by = "gene_id") %>% pull(gene_name)
+    
+    rownames(mat.centered) = lab.names
+    
+    clust.ht.rdbu = Heatmap(mat.centered[sort(rownames(mat.centered)), ], name = "expression", 
+            col = rdbu.palette,
+            column_split = rld$treatment,
+            top_annotation = HeatmapAnnotation(cluster = anno_block(
+        gp = gpar(fill = c("grey", "goldenrod1"), col = "white"), # <- here controls the filled color
+        ) ),
+            column_names_gp = gpar(fontsize = 0),
+        cluster_rows = FALSE,
+        cluster_column_slices = FALSE, 
+        row_dend_width = unit(0, "cm"),
+        column_dend_height = unit(0, "cm"),
+        row_dend_gp = gpar(col = "white"),
+        column_dend_gp = gpar(col = "white") )
+    
+    pwidth = 4
+    pheight = length(DE.genes) / 15 + 3.8
+    
+    pdf(here(file.path(fig.dir, paste0(ct,".SAvsPBS.Heatmap.pdf"))), 
+        width = pwidth, height = pheight)
+    draw(clust.ht.rdbu)
+    dev.off()
+    
+}
+```
+
 
 ### FGSEA analysis 
 
@@ -159,6 +218,7 @@ for (ct in cell.types) {
 ```
 
 ```{r}
+
 filtered.fgsea = list()
 for (ct in cell.types) {
     
@@ -209,5 +269,4 @@ for (ct in cell.types) {
 }
 
 ```
-
 
