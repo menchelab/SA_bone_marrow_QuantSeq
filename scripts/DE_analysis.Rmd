@@ -138,22 +138,17 @@ center_apply <- function(x) {
 for (ct in cell.types) {
     
     rld = rlog (ct.res[[ct]]$dds)
-    
-    # DE.genes = ct.res[[ct]]$res %>% as.data.frame() %>% 
+
+    # DE.genes = ct.res[[ct]]$res %>% as.data.frame() %>%
     #     rownames_to_column("gene") %>%
-    #     filter(padj < 0.05, abs(log2FoldChange) > 1.8 ) %>% pull(gene) 
-    #     
+    #     filter(padj < 0.05, abs(log2FoldChange) > 1.8 ) %>% pull(gene)
+
     
-    DE.genes = ct.res[[ct]]$dds %>% as.data.frame() %>% 
-        rownames_to_column("gene") %>% arrange() 
-        filter(padj < 0.05, abs(log2FoldChange) > 1.8 ) %>% pull(gene) 
-        
-    mat = assay(rld)[DE.genes, ]
-     
-    mat.centered = center_apply(mat)
-    
-    rdbu.palette = colorRamp2(c(quantile(mat.centered, 0.01), 0, quantile(mat.centered, 0.99)), 
-                          c("dodgerblue4", "white", "darkred"), space = "RGB")
+    DE.genes = ct.res[[ct]]$res %>% as.data.frame() %>%
+        rownames_to_column("gene") %>%
+        filter(padj < 0.05) %>% 
+        arrange(-abs(log2FoldChange)) %>%
+        head(n = 50) %>% pull(gene)
 
     
     lab.names = DE.genes %>% 
@@ -161,7 +156,14 @@ for (ct in cell.types) {
         dplyr::left_join (., gene.data %>% dplyr::select(gene_id, gene_name) ,
                                                  by = "gene_id") %>% pull(gene_name)
     
+    mat = assay(rld)[DE.genes, ]
+    
+    mat.centered = center_apply(mat)
+    
     rownames(mat.centered) = lab.names
+    
+    rdbu.palette = colorRamp2(c(quantile(mat.centered, 0.01), 0, quantile(mat.centered, 0.99)), 
+                          c("dodgerblue4", "white", "darkred"), space = "RGB")
     
     clust.ht.rdbu = Heatmap(mat.centered[sort(rownames(mat.centered)), ], name = "expression", 
             col = rdbu.palette,
@@ -177,10 +179,17 @@ for (ct in cell.types) {
         row_dend_gp = gpar(col = "white"),
         column_dend_gp = gpar(col = "white") )
     
-    pwidth = 4
-    pheight = length(DE.genes) / 12 + 4.8
+    # pwidth = 4
+    # pheight = length(DE.genes) / 12 + 4.8
     
-    if (ct == "Eosinophil_progenitor") {pheight = pheight + 4}
+    # if (ct == "Eosinophil_progenitor") {pheight = pheight + 4}
+    
+    pwidth = 3.5
+    pheight = 12
+    
+    if (any(grepl("ENSMUS", DE.genes))) {
+        pwidth = pwidth + 2
+    }
     
     pdf(here(file.path(fig.dir, paste0(ct,".SAvsPBS.Heatmap.pdf"))), 
         width = pwidth, height = pheight)
@@ -288,6 +297,37 @@ source(here("submodule/modulescoring/geneset_modulescoring.R"))
 
 gene_list = gene.sets$GO_Biological_Process_2021.txt$`antigen processing and presentation of exogenous peptide antigen via MHC class II (GO:0019886)`
 
+gene_list = list( 
+    NFkB = gene.sets$GO_Biological_Process_2021.txt$`regulation of NIK/NF-kappaB signaling (GO:1901222)`,
+    chemotaxis = gene.sets$GO_Biological_Process_2021.txt$`cell chemotaxis (GO:0060326)`,
+    cell_cycle = gene.sets$GO_Biological_Process_2021.txt$`positive regulation of cell cycle process (GO:0090068)`,
+    protein_phosphorylation = gene.sets$GO_Biological_Process_2021.txt$`positive regulation of protein phosphorylation (GO:0001934)`,
+    mhc2_antigen_PP = gene.sets$GO_Biological_Process_2021.txt$`antigen processing and presentation of peptide antigen via MHC class II (GO:0002495)`,
+    cell_division = gene.sets$GO_Biological_Process_2021.txt$`positive regulation of cell division (GO:0051781)`,
+    sensecence = gene.sets$GO_Biological_Process_2021.txt$`cellular senescence (GO:0090398)`,
+    glucose_metabolism = gene.sets$GO_Biological_Process_2021.txt$`glucose metabolic process (GO:0006006)`,
+    stress_response_transcription = gene.sets$GO_Biological_Process_2021.txt$`positive regulation of transcription from RNA polymerase II promoter in response to stress (GO:0036003)`,
+    actin_filament_polymerization = gene.sets$GO_Biological_Process_2021.txt$`regulation of actin filament polymerization (GO:0030833)`,
+    ubiquitin_dependent_protein_catabolism = gene.sets$GO_Biological_Process_2021.txt$`proteasome-mediated ubiquitin-dependent protein catabolic process (GO:0043161)`
+    )
+
+path_names = c(NFkB = "regulation of NIK/NF-kappaB signaling",
+    chemotaxis = "cell chemotaxis",
+    cell_cycle = "positive regulation of cell cycle process",
+    protein_phosphorylation = "positive regulation of protein phosphorylation",
+    mhc2_antigen_PP = "antigen processing and presentation of peptide antigen via MHC class II",
+    cell_division = "positive regulation of cell division",
+    sensecence = "cellular senescence",
+    glucose_metabolism = "glucose metabolic process",
+    stress_response_transcription = "positive regulation of transcription from RNA polymerase II promoter in response to stress",
+    actin_filament_polymerization = "regulation of actin filament polymerization",
+    ubiquitin_dependent_protein_catabolism = "proteasome-mediated ubiquitin-dependent protein catabolic process"
+    )
+
+
+
+ct.gss = list()
+
 for (ct in names(ct.res)) {
     
     dds_rownames_hgnc = rownames(ct.res[[ct]]$dds) %>% 
@@ -297,13 +337,49 @@ for (ct in names(ct.res)) {
     
     dds_copy = ct.res[[ct]]$dds
 
+    ct.gss[[ct]] = dds_copy@colData
+    
     rownames(dds_copy) = dds_rownames_hgnc
     
-    mouse_gene_list = convert_human_to_mouse(gene_list)
+    for (gl_name in names(gene_list) ) {
+    
+        mouse_gene_list = convert_human_to_mouse(gene_list[[gl_name]])
 
-    dds_added = AddGeneSetScore(dds = dds_test, mouse_gene_list[,2], name = "gene_list")
+        dds_added = AddGeneSetScore(dds = dds_copy, mouse_gene_list[,2], name = gl_name)
+        
+        ct.gss[[ct]][gl_name] = colData(dds_added)[paste0(gl_name, "1")]
+    }
 }
 ```
+
+
+```{r}
+library(ggsignif)
+
+for (tname in c("t.test", "wilcox.test") ) {
+    for (ct in names(ct.gss)) {
+        dd = ct.gss[[ct]]
+        
+        pp = dd %>% as_tibble() %>% 
+            select(c(treatment, NFkB:ubiquitin_dependent_protein_catabolism) ) %>% 
+            pivot_longer(cols = !treatment, names_to = "geneset", values_to = "score") %>% 
+            mutate(path = path_names[geneset]) %>% 
+            ggplot(aes (x = treatment, y = score)) + 
+            geom_boxplot(aes(fill = treatment)) + geom_jitter() + 
+            facet_wrap(~path, labeller = label_wrap_gen() ) +
+            theme_bw() + 
+            scale_fill_manual(values = c("PBS" = "grey", "SA" = "goldenrod1")) + 
+            geom_signif(comparisons = list(c("PBS", "SA")), 
+                        map_signif_level=TRUE, test = tname,  margin_top = 0.1) + 
+            scale_y_continuous(limits = c(0, 1.2), breaks = seq(0, 1, 0.25))
+        
+        ggsave(plot = pp, filename = file.path(
+            fig.dir, paste(ct, tname, "modulescoring.pdf", sep = ".")),
+            width = 8, height = 7)
+    }
+}
+```
+
 
 
 ### Getting the emaplot
@@ -364,7 +440,6 @@ for (ct in names(ct.res)) {
 ### PCA for all the samples
 
 ```{r}
-
 counts.mat = as.matrix(counts.raw[, 9:ncol(counts.raw)])
 rdata = counts.raw[, 1:8]
 cdata = smp.table %>% filter(Sample_Name %in% colnames(counts.mat)) 
@@ -375,6 +450,48 @@ se = SummarizedExperiment(assays = counts.mat,
 
 dds_all = DESeqDataSet(se, design= ~ treatment)
 normed = rlog(dds_all)
+```
+
+### PCA for the cell types separately
+
+```{r}
+
+N = 1000  ### top variable genes
+
+for (ct in unique(normed$cell.type)) {
+    ct_normed = normed[, normed$cell.type == ct]
+    
+    rv <- rowVars(assay(ct_normed))
+    select <- order(rv, decreasing=TRUE)[seq_len(min(N, length(rv)))]
+    
+    # perform a PCA on the data in assay(x) for the selected genes
+    pca <- prcomp(t(assay(ct_normed)[select,]))
+    
+    # the contribution to the total variance for each component
+    percentVar <- pca$sdev^2 / sum( pca$sdev^2 )
+    
+    sample_pca = pca$x %>% as.data.frame() %>%
+        mutate(treatment = ct_normed$treatment) %>% 
+        ggplot(aes(x = PC1, y = PC2, color = treatment)) +
+        geom_point(size = 3) + 
+        xlab(paste0("PC1: ",round(percentVar[1] * 100),"% variance")) +
+        ylab(paste0("PC2: ",round(percentVar[2] * 100),"% variance")) +
+        coord_fixed() + 
+        theme_classic() +
+        # scale_color_manual(values = "#FFFFFF") + 
+        scale_color_manual(values = c("PBS" = "grey", "SA" = "goldenrod1"))
+    
+    # scale_shape_manual(values = c("PBS" = 16, "SA" = 17) ) +
+     
+    ggsave(here(file.path(fig.dir, paste0(ct,".SAvsPBS.PCA.pdf"))), 
+        width = 4, height = 2.5)  
+}
+
+
+```
+
+
+```{r}
 
 pca.data = plotPCA(normed, intgroup = c("treatment", "cell.type"), returnData = TRUE)
 
