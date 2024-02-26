@@ -1,3 +1,6 @@
 [submodule "submodule"]
 	path = submodule
 	url = https://github.com/HerpelinckT/geneset-modulescoring.git
+[submodule "cytopus"]
+	path = cytopus
+	url = https://github.com/wallet-maker/cytopus.git
