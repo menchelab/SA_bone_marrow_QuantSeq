@@ -37,6 +37,7 @@ for (dir in c(out.dir, fig.dir)) {
 
 source(here("scripts/functions.R"))
 source("../../SA_bone_marrow/R/functions.R")
+source(here("submodule/modulescoring/geneset_modulescoring.R"))
 ```
 
 ### Reading in the data
@@ -207,7 +208,7 @@ for (ct in cell.types) {
 ```{r}
 gene.sets = list()
 
-for (gene.set.paths in list.files(here("data/gene_sets"), full.names = TRUE)) {
+for (gene.set.paths in list.files(here("data/gene_sets"), full.names = TRUE, pattern = "txt")) {
     file.base = basename(gene.set.paths)
     
     gene.sets[[file.base]] = read_gene_sets(gene.set.paths)
@@ -420,6 +421,29 @@ for (ct in names(ct.res)) {
         
     }
 }
+
+```
+
+### Saving the cytopus files
+
+```{r}
+wb = openxlsx::createWorkbook()
+
+for (ct in names(ct.gss.cyto)) {
+    
+    cat(ct, "\n")
+    
+    sheetname = openxlsx::addWorksheet(wb = wb, sheetName = ct)
+    
+    openxlsx::writeData(wb = wb,
+              sheet = sheetname,
+              x = ct.gss.cyto[[ct]] %>% as_tibble(),
+              colNames = TRUE,
+              rowNames = FALSE)
+    
+}
+
+openxlsx::saveWorkbook(wb = wb, file = file.path(here("outputs"), "cytopus_genescoring.xlsx"), overwrite = TRUE )
 
 ```
 
