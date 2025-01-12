@@ -36,6 +36,8 @@ for (dir in c(out.dir, fig.dir)) {
 }
 
 source(here("scripts/functions.R"))
+
+# Functions from menchelab/SA_bone_marrow repository
 source("../../SA_bone_marrow/R/functions.R")
 source(here("submodule/modulescoring/geneset_modulescoring.R"))
 ```
