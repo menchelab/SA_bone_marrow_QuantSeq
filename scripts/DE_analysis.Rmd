@@ -121,8 +121,32 @@ for (ct in cell.types) {
         labSize = 6.0,
         col=c('black', 'black', 'black', 'red3'),
         colAlpha = 1)
-        ggsave(plot = pp, filename = file.path(fig.dir, paste0(ct,".SAvsPBS․Volcano.pdf")),
-               width = 7, height = 6)
+        ggsave(plot = pp, filename = file.path(fig.dir, paste0(ct,".SAvsPBS․Volcano_h7.pdf")),
+               width = 7, height = 7)
+}
+
+for (ct in cell.types) {
+    
+    res.out = ct.res[[ct]]$res
+    lab.names = ct.res[[ct]]$res %>% 
+        as.data.frame %>% 
+        rownames_to_column(var = "gene_id") %>% 
+        dplyr::left_join (., gene.data %>% dplyr::select(gene_id, gene_name) ,
+                                                 by = "gene_id") %>% pull(gene_name)
+    
+    pp = EnhancedVolcano(res.out,
+        lab = lab.names,
+        x = 'log2FoldChange',
+        y = 'pvalue',
+        title = paste0(ct, " SA vs PBS"),
+        pCutoff = 0.05,
+        FCcutoff = 1,
+        pointSize = 3.0,
+        labSize = 6.0,
+        col=c('black', 'black', 'black', 'red3'),
+        colAlpha = 1)
+        ggsave(plot = pp, filename = file.path(fig.dir, paste0(ct,".SAvsPBS․Volcano_h9.pdf")),
+               width = 7, height = 9)
 }
 ```
 
